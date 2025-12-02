@@ -301,7 +301,7 @@
     <script>
       const API_URL = "https://medical-agent-cenate-production.up.railway.app";
 
-      // Tool 1: Risk Stratification
+      // Tool 1: Risk Stratification (MEJORADO)
       document
         .getElementById("riskForm")
         .addEventListener("submit", async (e) => {
@@ -328,12 +328,63 @@
             });
 
             const result = await response.json();
+            const r = result.result;
+
+            // Formatear resultado con colores
+            const getRiskColor = (nivel) => {
+              if (nivel === "Alto") return "#dc3545";
+              if (nivel === "Moderado") return "#ffc107";
+              return "#28a745";
+            };
+
+            let html = "<h3>✅ Evaluación de Riesgo</h3>";
+            html += '<div style="margin-top: 15px;">';
+
+            if (r.evaluacion.diabetes) {
+              const color = getRiskColor(r.evaluacion.diabetes);
+              html += `<p style="padding: 8px; background: ${color}20; border-left: 4px solid ${color}; margin-bottom: 10px;">
+                    <strong>🩺 Diabetes:</strong> <span style="color: ${color}; font-weight: bold;">${r.evaluacion.diabetes}</span>
+                </p>`;
+            }
+
+            if (r.evaluacion.hipertension) {
+              const color = getRiskColor(r.evaluacion.hipertension);
+              html += `<p style="padding: 8px; background: ${color}20; border-left: 4px solid ${color}; margin-bottom: 10px;">
+                    <strong>❤️ Hipertensión:</strong> <span style="color: ${color}; font-weight: bold;">${r.evaluacion.hipertension}</span>
+                </p>`;
+            }
+
+            if (r.evaluacion.dislipidemia) {
+              const color = getRiskColor(r.evaluacion.dislipidemia);
+              html += `<p style="padding: 8px; background: ${color}20; border-left: 4px solid ${color}; margin-bottom: 10px;">
+                    <strong>🧪 Dislipidemia:</strong> <span style="color: ${color}; font-weight: bold;">${r.evaluacion.dislipidemia}</span>
+                </p>`;
+            }
+
+            if (r.evaluacion.psicologico) {
+              const color = getRiskColor(r.evaluacion.psicologico);
+              html += `<p style="padding: 8px; background: ${color}20; border-left: 4px solid ${color}; margin-bottom: 10px;">
+                    <strong>🧠 Salud Mental:</strong> <span style="color: ${color}; font-weight: bold;">${r.evaluacion.psicologico}</span>
+                </p>`;
+            }
+
+            html += "</div>";
+
+            if (r.recomendaciones && r.recomendaciones.length > 0) {
+              html +=
+                '<div style="margin-top: 15px; padding: 10px; background: #fff3cd; border-left: 4px solid #ffc107;">';
+              html +=
+                '<strong>⚠️ Recomendaciones:</strong><ul style="margin: 10px 0 0 20px;">';
+              r.recomendaciones.forEach((rec) => {
+                html += `<li>${rec}</li>`;
+              });
+              html += "</ul></div>";
+            }
+
+            html += `<p style="margin-top: 15px; font-size: 0.85em; color: #666;"><strong>📄 Fuente:</strong> ${r.fuente}</p>`;
 
             resultDiv.className = "result show success";
-            resultDiv.innerHTML = `
-                    <h3>✅ Resultado</h3>
-                    <pre>${JSON.stringify(result.result, null, 2)}</pre>
-                `;
+            resultDiv.innerHTML = html;
           } catch (error) {
             resultDiv.className = "result show error";
             resultDiv.innerHTML = `<h3>❌ Error</h3><p>${error.message}</p>`;
@@ -374,12 +425,44 @@
             });
 
             const result = await response.json();
+            const r = result.result;
+
+            let html = "<h3>✅ Resultado de Validación</h3>";
+
+            // Elegibilidad
+            const elegibleColor = r.elegible ? "#28a745" : "#dc3545";
+            const elegibleIcon = r.elegible ? "✅" : "❌";
+            html += `<div style="padding: 15px; background: ${elegibleColor}20; border-left: 4px solid ${elegibleColor}; margin: 15px 0;">
+                <p style="font-size: 1.2em; font-weight: bold; color: ${elegibleColor};">
+                    ${elegibleIcon} ${
+              r.elegible ? "ELEGIBLE" : "NO ELEGIBLE"
+            } para Telecolposcopía
+                </p>
+            </div>`;
+
+            // Criterios cumplidos
+            if (r.criterios_cumplidos && r.criterios_cumplidos.length > 0) {
+              html += '<div style="margin: 15px 0;">';
+              html +=
+                '<strong>✔️ Criterios Cumplidos:</strong><ul style="margin: 10px 0 0 20px;">';
+              r.criterios_cumplidos.forEach((criterio) => {
+                html += `<li style="color: #28a745;">${criterio}</li>`;
+              });
+              html += "</ul></div>";
+            }
+
+            // Detalles
+            if (r.detalles) {
+              html += `<div style="margin: 15px 0; padding: 10px; background: #f8f9fa; border-radius: 5px;">
+                    <strong>📋 Detalles:</strong>
+                    <p style="margin: 5px 0 0 0;">${r.detalles}</p>
+                </div>`;
+            }
+
+            html += `<p style="margin-top: 15px; font-size: 0.85em; color: #666;"><strong>📄 Fuente:</strong> ${r.fuente}</p>`;
 
             resultDiv.className = "result show success";
-            resultDiv.innerHTML = `
-                    <h3>✅ Resultado</h3>
-                    <pre>${JSON.stringify(result.result, null, 2)}</pre>
-                `;
+            resultDiv.innerHTML = html;
           } catch (error) {
             resultDiv.className = "result show error";
             resultDiv.innerHTML = `<h3>❌ Error</h3><p>${error.message}</p>`;
@@ -412,18 +495,18 @@
             if (result.result.error) {
               resultDiv.className = "result show error";
               resultDiv.innerHTML = `
-                        <h3>❌ Error</h3>
-                        <p>${result.result.error}</p>
-                        <p><strong>Tipos disponibles:</strong> ${result.result.tipos_disponibles.join(
-                          ", "
-                        )}</p>
-                    `;
+                    <h3>❌ Error</h3>
+                    <p>${result.result.error}</p>
+                    <p><strong>Tipos disponibles:</strong> ${result.result.tipos_disponibles.join(
+                      ", "
+                    )}</p>
+                `;
             } else {
               resultDiv.innerHTML = `
-                        <h3>✅ Plantilla Generada</h3>
-                        <pre style="white-space: pre-wrap; font-family: monospace; line-height: 1.6;">${result.result.plantilla}</pre>
-                        <p style="margin-top: 10px; font-size: 0.9em; color: #666;"><strong>Fuente:</strong> ${result.result.fuente}</p>
-                    `;
+                    <h3>✅ Plantilla Generada</h3>
+                    <pre style="white-space: pre-wrap; font-family: monospace; line-height: 1.6;">${result.result.plantilla}</pre>
+                    <p style="margin-top: 10px; font-size: 0.9em; color: #666;"><strong>Fuente:</strong> ${result.result.fuente}</p>
+                `;
             }
           } catch (error) {
             resultDiv.className = "result show error";
