@@ -10,3 +10,8 @@ env/
 .idea/
 *.log
 .DS_Store
+.git/
+.github/
+tests/
+*.md
+data/faiss_index/
