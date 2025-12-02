@@ -147,6 +147,8 @@
         border-radius: 5px;
         overflow-x: auto;
         font-size: 0.9rem;
+        white-space: pre-wrap;
+        line-height: 1.6;
       }
 
       .loading {
@@ -387,7 +389,7 @@
           }
         });
 
-      // Tool 3: Template
+      // Tool 3: Template (CORREGIDO)
       document
         .getElementById("templateForm")
         .addEventListener("submit", async (e) => {
@@ -406,10 +408,23 @@
             const result = await response.json();
 
             resultDiv.className = "result show success";
-            resultDiv.innerHTML = `
-                    <h3>✅ Plantilla Generada</h3>
-                    <pre>${result.result.plantilla}</pre>
-                `;
+
+            if (result.result.error) {
+              resultDiv.className = "result show error";
+              resultDiv.innerHTML = `
+                        <h3>❌ Error</h3>
+                        <p>${result.result.error}</p>
+                        <p><strong>Tipos disponibles:</strong> ${result.result.tipos_disponibles.join(
+                          ", "
+                        )}</p>
+                    `;
+            } else {
+              resultDiv.innerHTML = `
+                        <h3>✅ Plantilla Generada</h3>
+                        <pre style="white-space: pre-wrap; font-family: monospace; line-height: 1.6;">${result.result.plantilla}</pre>
+                        <p style="margin-top: 10px; font-size: 0.9em; color: #666;"><strong>Fuente:</strong> ${result.result.fuente}</p>
+                    `;
+            }
           } catch (error) {
             resultDiv.className = "result show error";
             resultDiv.innerHTML = `<h3>❌ Error</h3><p>${error.message}</p>`;
