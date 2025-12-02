@@ -9,9 +9,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copiar código
 COPY src/ ./src/
 COPY data/ ./data/
-COPY .env .env
 
-# Puerto
+# Exponer puerto
 EXPOSE 8000
 
 # Comando de inicio
