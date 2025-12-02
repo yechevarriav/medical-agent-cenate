@@ -1,81 +1,122 @@
 from langchain.tools import StructuredTool
 from pydantic import BaseModel, Field
-from typing import Optional
-import json
+from typing import Optional, List
 
 class RiskInput(BaseModel):
-    a1c: Optional[float] = Field(default=None, description="A1C en %")
-    pa_sistolica: Optional[int] = Field(default=None, description="PA sistólica mmHg")
-    pa_diastolica: Optional[int] = Field(default=None, description="PA diastólica mmHg")
-    ldl: Optional[int] = Field(default=None, description="LDL mg/dL")
-    phq9: Optional[int] = Field(default=None, description="PHQ-9 score")
-    gad7: Optional[int] = Field(default=None, description="GAD-7 score")
+    a1c: Optional[float] = Field(default=None, description="Hemoglobina A1C (%)")
+    pa_sistolica: Optional[int] = Field(default=None, description="Presión arterial sistólica (mmHg)")
+    pa_diastolica: Optional[int] = Field(default=None, description="Presión arterial diastólica (mmHg)")
+    ldl: Optional[int] = Field(default=None, description="Colesterol LDL (mg/dL)")
+    phq9: Optional[int] = Field(default=None, description="Escala PHQ-9 (0-27)")
+    gad7: Optional[int] = Field(default=None, description="Escala GAD-7 (0-21)")
 
 class RiskStratificationTool:
-    def estratificar(self,
-                     a1c: Optional[float] = None,
-                     pa_sistolica: Optional[int] = None,
-                     pa_diastolica: Optional[int] = None,
-                     ldl: Optional[int] = None,
-                     phq9: Optional[int] = None,
-                     gad7: Optional[int] = None) -> str:
+    def __init__(self):
+        self.fuente = "PM.2.1.2 Anexo 10 - Criterios de Estandarización de Riesgo"
 
-        resultado = {"evaluacion": {}, "recomendaciones": []}
+    def estratificar(
+        self,
+        a1c: Optional[float] = None,
+        pa_sistolica: Optional[int] = None,
+        pa_diastolica: Optional[int] = None,
+        ldl: Optional[int] = None,
+        phq9: Optional[int] = None,
+        gad7: Optional[int] = None
+    ) -> dict:
+        """Estratifica riesgo según criterios PM.2.1.2 Anexo 10"""
 
-        # Diabetes
+        evaluacion = {}
+        recomendaciones = []
+
+        # DIABETES (A1C)
         if a1c is not None:
             if a1c < 7:
-                resultado["evaluacion"]["diabetes"] = "Bajo"
-                resultado["recomendaciones"].append("Monitoreo trimestral")
+                evaluacion["diabetes"] = "Bajo"
             elif 7 <= a1c <= 8:
-                resultado["evaluacion"]["diabetes"] = "Moderado"
-                resultado["recomendaciones"].append("Monitoreo mensual")
-            else:
-                resultado["evaluacion"]["diabetes"] = "Alto"
-                resultado["recomendaciones"].append("Derivar a endocrinología")
+                evaluacion["diabetes"] = "Moderado"
+            else:  # a1c > 8
+                evaluacion["diabetes"] = "Alto"
+                recomendaciones.append("Derivar a endocrinología")
 
-        # Hipertensión
-        if pa_sistolica and pa_diastolica:
+        # HIPERTENSIÓN
+        if pa_sistolica is not None and pa_diastolica is not None:
             if pa_sistolica < 140 and pa_diastolica < 90:
-                resultado["evaluacion"]["hipertension"] = "Bajo"
-            elif pa_sistolica < 160 or pa_diastolica < 100:
-                resultado["evaluacion"]["hipertension"] = "Moderado"
-            else:
-                resultado["evaluacion"]["hipertension"] = "Alto"
-                resultado["recomendaciones"].append("Derivar a cardiología")
+                evaluacion["hipertension"] = "Controlado"
+            elif (140 <= pa_sistolica < 160) or (90 <= pa_diastolica < 100):
+                evaluacion["hipertension"] = "Moderado"
+            else:  # PA >= 160/100
+                evaluacion["hipertension"] = "Alto"
+                recomendaciones.append("Derivar a cardiología")
 
-        # Dislipidemia
+        # DISLIPIDEMIA (LDL)
         if ldl is not None:
             if ldl < 70:
-                resultado["evaluacion"]["dislipidemia"] = "Bajo"
-            elif ldl <= 100:
-                resultado["evaluacion"]["dislipidemia"] = "Moderado"
-            else:
-                resultado["evaluacion"]["dislipidemia"] = "Alto"
+                evaluacion["dislipidemia"] = "Bajo"
+            elif 70 <= ldl <= 100:
+                evaluacion["dislipidemia"] = "Moderado"
+            else:  # ldl > 100
+                evaluacion["dislipidemia"] = "Alto"
 
-        # Psicológico
-        if phq9 and gad7:
-            if phq9 < 5 and gad7 < 5:
-                resultado["evaluacion"]["psicologico"] = "Bajo"
-            elif phq9 <= 9 or gad7 <= 9:
-                resultado["evaluacion"]["psicologico"] = "Moderado"
-            else:
-                resultado["evaluacion"]["psicologico"] = "Alto"
-                resultado["recomendaciones"].append("Derivar a psiquiatría")
+        # SALUD MENTAL
+        if phq9 is not None or gad7 is not None:
+            scores = [s for s in [phq9, gad7] if s is not None]
+            max_score = max(scores)
 
-        resultado["fuente"] = "PM.2.1.2 Anexo 10"
-        return json.dumps(resultado, ensure_ascii=False, indent=2)
+            if max_score < 5:
+                evaluacion["psicologico"] = "Bajo"
+            elif 5 <= max_score <= 9:
+                evaluacion["psicologico"] = "Moderado"
+            else:  # >= 10
+                evaluacion["psicologico"] = "Alto"
+                recomendaciones.append("Derivar a psiquiatría")
+
+        # Determinar frecuencia de monitoreo
+        niveles_alto = [v for v in evaluacion.values() if v == "Alto"]
+        if niveles_alto:
+            recomendaciones.append("Control mensual requerido")
+        else:
+            recomendaciones.append("Control trimestral")
+
+        return {
+            "evaluacion": evaluacion,
+            "recomendaciones": recomendaciones,
+            "fuente": self.fuente
+        }
 
     def as_tool(self):
         return StructuredTool.from_function(
             func=self.estratificar,
             name="estratificar_riesgo_cronico",
-            description="Clasifica riesgo de pacientes crónicos (Bajo/Moderado/Alto)",
+            description="Estratifica riesgo de pacientes crónicos según PM.2.1.2 Anexo 10: diabetes (A1C), hipertensión (PA), dislipidemia (LDL), salud mental (PHQ-9/GAD-7)",
             args_schema=RiskInput
         )
 
 if __name__ == "__main__":
-    print("🧪 TEST RISK TOOL")
+    print("=" * 80)
+    print("🧪 TEST: ESTRATIFICACIÓN DE RIESGO")
+    print("=" * 80)
+
     tool = RiskStratificationTool()
-    result = tool.estratificar(a1c=8.5, pa_sistolica=150, pa_diastolica=95, ldl=110)
-    print(result)
+
+    # Test: Paciente con múltiples factores de riesgo alto
+    print("\n--- Test: Paciente Alto Riesgo ---")
+    result = tool.estratificar(
+        a1c=11,
+        pa_sistolica=122,
+        pa_diastolica=98,
+        ldl=112,
+        phq9=10,
+        gad7=21
+    )
+
+    print(f"📊 Evaluación:")
+    for categoria, nivel in result["evaluacion"].items():
+        print(f"   {categoria.capitalize()}: {nivel}")
+
+    print(f"\n⚠️  Recomendaciones:")
+    for rec in result["recomendaciones"]:
+        print(f"   - {rec}")
+
+    print(f"\n📄 Fuente: {result['fuente']}")
+
+    print("\n" + "=" * 80)

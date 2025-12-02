@@ -301,7 +301,7 @@
     <script>
       const API_URL = "https://medical-agent-cenate-production.up.railway.app";
 
-      // Tool 1: Risk Stratification (MEJORADO)
+      // Tool 1: Risk Stratification (CORREGIDO)
       document
         .getElementById("riskForm")
         .addEventListener("submit", async (e) => {
@@ -328,10 +328,20 @@
             });
 
             const result = await response.json();
+
+            // VERIFICAR ESTRUCTURA DE LA RESPUESTA
+            console.log("Response:", result); // Para debug
+
             const r = result.result;
+
+            // Verificar que evaluacion existe
+            if (!r || !r.evaluacion) {
+              throw new Error("Respuesta inválida del servidor");
+            }
 
             // Formatear resultado con colores
             const getRiskColor = (nivel) => {
+              if (!nivel) return "#6c757d"; // Gris si no hay dato
               if (nivel === "Alto") return "#dc3545";
               if (nivel === "Moderado") return "#ffc107";
               return "#28a745";
@@ -343,33 +353,34 @@
             if (r.evaluacion.diabetes) {
               const color = getRiskColor(r.evaluacion.diabetes);
               html += `<p style="padding: 8px; background: ${color}20; border-left: 4px solid ${color}; margin-bottom: 10px;">
-                    <strong>🩺 Diabetes:</strong> <span style="color: ${color}; font-weight: bold;">${r.evaluacion.diabetes}</span>
-                </p>`;
+                <strong>🩺 Diabetes:</strong> <span style="color: ${color}; font-weight: bold;">${r.evaluacion.diabetes}</span>
+            </p>`;
             }
 
             if (r.evaluacion.hipertension) {
               const color = getRiskColor(r.evaluacion.hipertension);
               html += `<p style="padding: 8px; background: ${color}20; border-left: 4px solid ${color}; margin-bottom: 10px;">
-                    <strong>❤️ Hipertensión:</strong> <span style="color: ${color}; font-weight: bold;">${r.evaluacion.hipertension}</span>
-                </p>`;
+                <strong>❤️ Hipertensión:</strong> <span style="color: ${color}; font-weight: bold;">${r.evaluacion.hipertension}</span>
+            </p>`;
             }
 
             if (r.evaluacion.dislipidemia) {
               const color = getRiskColor(r.evaluacion.dislipidemia);
               html += `<p style="padding: 8px; background: ${color}20; border-left: 4px solid ${color}; margin-bottom: 10px;">
-                    <strong>🧪 Dislipidemia:</strong> <span style="color: ${color}; font-weight: bold;">${r.evaluacion.dislipidemia}</span>
-                </p>`;
+                <strong>🧪 Dislipidemia:</strong> <span style="color: ${color}; font-weight: bold;">${r.evaluacion.dislipidemia}</span>
+            </p>`;
             }
 
             if (r.evaluacion.psicologico) {
               const color = getRiskColor(r.evaluacion.psicologico);
               html += `<p style="padding: 8px; background: ${color}20; border-left: 4px solid ${color}; margin-bottom: 10px;">
-                    <strong>🧠 Salud Mental:</strong> <span style="color: ${color}; font-weight: bold;">${r.evaluacion.psicologico}</span>
-                </p>`;
+                <strong>🧠 Salud Mental:</strong> <span style="color: ${color}; font-weight: bold;">${r.evaluacion.psicologico}</span>
+            </p>`;
             }
 
             html += "</div>";
 
+            // Recomendaciones
             if (r.recomendaciones && r.recomendaciones.length > 0) {
               html +=
                 '<div style="margin-top: 15px; padding: 10px; background: #fff3cd; border-left: 4px solid #ffc107;">';
@@ -381,11 +392,15 @@
               html += "</ul></div>";
             }
 
-            html += `<p style="margin-top: 15px; font-size: 0.85em; color: #666;"><strong>📄 Fuente:</strong> ${r.fuente}</p>`;
+            // Fuente
+            html += `<p style="margin-top: 15px; font-size: 0.85em; color: #666;"><strong>📄 Fuente:</strong> ${
+              r.fuente || "PM.2.1.2 Anexo 10"
+            }</p>`;
 
             resultDiv.className = "result show success";
             resultDiv.innerHTML = html;
           } catch (error) {
+            console.error("Error:", error);
             resultDiv.className = "result show error";
             resultDiv.innerHTML = `<h3>❌ Error</h3><p>${error.message}</p>`;
           } finally {
@@ -393,7 +408,6 @@
             btn.textContent = "Evaluar Riesgo";
           }
         });
-
       // Tool 2: Validate
       document
         .getElementById("validateForm")
