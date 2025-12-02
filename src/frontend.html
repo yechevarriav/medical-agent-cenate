@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CENATE - Asistente Médico Virtual</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 20px;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+
+      .header {
+        text-align: center;
+        color: white;
+        margin-bottom: 40px;
+      }
+
+      .header h1 {
+        font-size: 2.5rem;
+        margin-bottom: 10px;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+      }
+
+      .header p {
+        font-size: 1.1rem;
+        opacity: 0.9;
+      }
+
+      .tools-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+        gap: 25px;
+        margin-bottom: 30px;
+      }
+
+      .tool-card {
+        background: white;
+        border-radius: 15px;
+        padding: 25px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        transition: transform 0.3s ease;
+      }
+
+      .tool-card:hover {
+        transform: translateY(-5px);
+      }
+
+      .tool-card h2 {
+        color: #667eea;
+        margin-bottom: 15px;
+        font-size: 1.5rem;
+      }
+
+      .form-group {
+        margin-bottom: 15px;
+      }
+
+      .form-group label {
+        display: block;
+        margin-bottom: 5px;
+        color: #333;
+        font-weight: 600;
+      }
+
+      .form-group input,
+      .form-group select {
+        width: 100%;
+        padding: 10px;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        font-size: 1rem;
+        transition: border-color 0.3s ease;
+      }
+
+      .form-group input:focus,
+      .form-group select:focus {
+        outline: none;
+        border-color: #667eea;
+      }
+
+      .btn {
+        width: 100%;
+        padding: 12px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: opacity 0.3s ease;
+      }
+
+      .btn:hover {
+        opacity: 0.9;
+      }
+
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .result {
+        margin-top: 20px;
+        padding: 15px;
+        background: #f5f5f5;
+        border-radius: 8px;
+        display: none;
+      }
+
+      .result.show {
+        display: block;
+      }
+
+      .result.success {
+        background: #d4edda;
+        border-left: 4px solid #28a745;
+      }
+
+      .result.error {
+        background: #f8d7da;
+        border-left: 4px solid #dc3545;
+      }
+
+      .result h3 {
+        margin-bottom: 10px;
+        color: #333;
+      }
+
+      .result pre {
+        background: white;
+        padding: 10px;
+        border-radius: 5px;
+        overflow-x: auto;
+        font-size: 0.9rem;
+      }
+
+      .loading {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        border-top-color: white;
+        animation: spin 1s ease-in-out infinite;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .api-info {
+        background: white;
+        border-radius: 15px;
+        padding: 20px;
+        text-align: center;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+      }
+
+      .api-info code {
+        background: #f5f5f5;
+        padding: 5px 10px;
+        border-radius: 5px;
+        color: #667eea;
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>🏥 CENATE - Asistente Médico Virtual</h1>
+        <p>Sistema de Apoyo para Procedimientos de Telemedicina - EsSalud</p>
+      </div>
+
+      <div class="tools-grid">
+        <!-- Tool 1: Estratificación de Riesgo -->
+        <div class="tool-card">
+          <h2>📊 Estratificación de Riesgo</h2>
+          <form id="riskForm">
+            <div class="form-group">
+              <label>Hemoglobina A1C (%):</label>
+              <input
+                type="number"
+                step="0.1"
+                name="a1c"
+                placeholder="Ej: 8.5"
+              />
+            </div>
+            <div class="form-group">
+              <label>Presión Sistólica (mmHg):</label>
+              <input type="number" name="pa_sistolica" placeholder="Ej: 155" />
+            </div>
+            <div class="form-group">
+              <label>Presión Diastólica (mmHg):</label>
+              <input type="number" name="pa_diastolica" placeholder="Ej: 98" />
+            </div>
+            <div class="form-group">
+              <label>Colesterol LDL (mg/dL):</label>
+              <input type="number" name="ldl" placeholder="Ej: 115" />
+            </div>
+            <div class="form-group">
+              <label>PHQ-9 (0-27):</label>
+              <input type="number" name="phq9" placeholder="Ej: 8" />
+            </div>
+            <div class="form-group">
+              <label>GAD-7 (0-21):</label>
+              <input type="number" name="gad7" placeholder="Ej: 6" />
+            </div>
+            <button type="submit" class="btn">Evaluar Riesgo</button>
+          </form>
+          <div id="riskResult" class="result"></div>
+        </div>
+
+        <!-- Tool 2: Validación Telecolposcopía -->
+        <div class="tool-card">
+          <h2>✅ Validación Telecolposcopía</h2>
+          <form id="validateForm">
+            <div class="form-group">
+              <label>Edad del paciente:</label>
+              <input type="number" name="edad" placeholder="Ej: 45" required />
+            </div>
+            <div class="form-group">
+              <label>Resultado PAP:</label>
+              <select name="pap_resultado">
+                <option value="">-- Seleccione --</option>
+                <option value="AGC">AGC</option>
+                <option value="ASC-H">ASC-H</option>
+                <option value="LIE-AG">LIE-AG</option>
+                <option value="CARCINOMA">CARCINOMA</option>
+                <option value="NEGATIVO">NEGATIVO</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>¿VPH Positivo?</label>
+              <select name="vph_positivo">
+                <option value="">-- Seleccione --</option>
+                <option value="true">Sí</option>
+                <option value="false">No</option>
+              </select>
+            </div>
+            <button type="submit" class="btn">Validar Elegibilidad</button>
+          </form>
+          <div id="validateResult" class="result"></div>
+        </div>
+
+        <!-- Tool 3: Generar Plantilla HCE -->
+        <div class="tool-card">
+          <h2>📋 Generar Plantilla HCE</h2>
+          <form id="templateForm">
+            <div class="form-group">
+              <label>Tipo de Plantilla:</label>
+              <select name="tipo" required>
+                <option value="">-- Seleccione --</option>
+                <option value="sincrona">Telecolposcopía Síncrona</option>
+                <option value="asincrona">Telecolposcopía Asíncrona</option>
+                <option value="cenacron">Atención CENACRON</option>
+              </select>
+            </div>
+            <button type="submit" class="btn">Generar Plantilla</button>
+          </form>
+          <div id="templateResult" class="result"></div>
+        </div>
+      </div>
+
+      <div class="api-info">
+        <p>
+          <strong>API Endpoint:</strong>
+          <code>https://medical-agent-cenate-production.up.railway.app</code>
+        </p>
+        <p style="margin-top: 10px; color: #666">
+          Documentación completa:
+          <a
+            href="https://medical-agent-cenate-production.up.railway.app/docs"
+            target="_blank"
+            style="color: #667eea"
+            >Ver Swagger UI</a
+          >
+        </p>
+      </div>
+    </div>
+
+    <script>
+      const API_URL = "https://medical-agent-cenate-production.up.railway.app";
+
+      // Tool 1: Risk Stratification
+      document
+        .getElementById("riskForm")
+        .addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const btn = e.target.querySelector("button");
+          const resultDiv = document.getElementById("riskResult");
+
+          btn.disabled = true;
+          btn.innerHTML = '<span class="loading"></span> Procesando...';
+
+          const formData = new FormData(e.target);
+          const data = {};
+          for (let [key, value] of formData.entries()) {
+            if (value) {
+              data[key] = key === "a1c" ? parseFloat(value) : parseInt(value);
+            }
+          }
+
+          try {
+            const response = await fetch(`${API_URL}/risk`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(data),
+            });
+
+            const result = await response.json();
+
+            resultDiv.className = "result show success";
+            resultDiv.innerHTML = `
+                    <h3>✅ Resultado</h3>
+                    <pre>${JSON.stringify(result.result, null, 2)}</pre>
+                `;
+          } catch (error) {
+            resultDiv.className = "result show error";
+            resultDiv.innerHTML = `<h3>❌ Error</h3><p>${error.message}</p>`;
+          } finally {
+            btn.disabled = false;
+            btn.textContent = "Evaluar Riesgo";
+          }
+        });
+
+      // Tool 2: Validate
+      document
+        .getElementById("validateForm")
+        .addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const btn = e.target.querySelector("button");
+          const resultDiv = document.getElementById("validateResult");
+
+          btn.disabled = true;
+          btn.innerHTML = '<span class="loading"></span> Validando...';
+
+          const formData = new FormData(e.target);
+          const data = {
+            edad: parseInt(formData.get("edad")),
+            pap_resultado: formData.get("pap_resultado") || null,
+            vph_positivo:
+              formData.get("vph_positivo") === "true"
+                ? true
+                : formData.get("vph_positivo") === "false"
+                ? false
+                : null,
+          };
+
+          try {
+            const response = await fetch(`${API_URL}/validate`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(data),
+            });
+
+            const result = await response.json();
+
+            resultDiv.className = "result show success";
+            resultDiv.innerHTML = `
+                    <h3>✅ Resultado</h3>
+                    <pre>${JSON.stringify(result.result, null, 2)}</pre>
+                `;
+          } catch (error) {
+            resultDiv.className = "result show error";
+            resultDiv.innerHTML = `<h3>❌ Error</h3><p>${error.message}</p>`;
+          } finally {
+            btn.disabled = false;
+            btn.textContent = "Validar Elegibilidad";
+          }
+        });
+
+      // Tool 3: Template
+      document
+        .getElementById("templateForm")
+        .addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const btn = e.target.querySelector("button");
+          const resultDiv = document.getElementById("templateResult");
+
+          btn.disabled = true;
+          btn.innerHTML = '<span class="loading"></span> Generando...';
+
+          const formData = new FormData(e.target);
+          const tipo = formData.get("tipo");
+
+          try {
+            const response = await fetch(`${API_URL}/template/${tipo}`);
+            const result = await response.json();
+
+            resultDiv.className = "result show success";
+            resultDiv.innerHTML = `
+                    <h3>✅ Plantilla Generada</h3>
+                    <pre>${result.result.plantilla}</pre>
+                `;
+          } catch (error) {
+            resultDiv.className = "result show error";
+            resultDiv.innerHTML = `<h3>❌ Error</h3><p>${error.message}</p>`;
+          } finally {
+            btn.disabled = false;
+            btn.textContent = "Generar Plantilla";
+          }
+        });
+    </script>
+  </body>
+</html>

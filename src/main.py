@@ -1,4 +1,6 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from tools.risk_tool import RiskStratificationTool
 from tools.validate_tool import ValidateTelecolposcopiaTool
@@ -19,7 +21,12 @@ risk_tool = RiskStratificationTool()
 validate_tool = ValidateTelecolposcopiaTool()
 template_tool = GenerateTemplateTool()
 
+# Servir frontend
 @app.get("/")
+async def serve_frontend():
+    return FileResponse("src/frontend.html")
+
+@app.get("/api")
 async def root():
     return {
         "message": "CENATE Medical Tools API",
