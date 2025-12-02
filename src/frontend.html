@@ -433,12 +433,12 @@
             const elegibleColor = r.elegible ? "#28a745" : "#dc3545";
             const elegibleIcon = r.elegible ? "✅" : "❌";
             html += `<div style="padding: 15px; background: ${elegibleColor}20; border-left: 4px solid ${elegibleColor}; margin: 15px 0;">
-                <p style="font-size: 1.2em; font-weight: bold; color: ${elegibleColor};">
-                    ${elegibleIcon} ${
+            <p style="font-size: 1.2em; font-weight: bold; color: ${elegibleColor};">
+                ${elegibleIcon} ${
               r.elegible ? "ELEGIBLE" : "NO ELEGIBLE"
             } para Telecolposcopía
-                </p>
-            </div>`;
+            </p>
+        </div>`;
 
             // Criterios cumplidos
             if (r.criterios_cumplidos && r.criterios_cumplidos.length > 0) {
@@ -454,12 +454,20 @@
             // Detalles
             if (r.detalles) {
               html += `<div style="margin: 15px 0; padding: 10px; background: #f8f9fa; border-radius: 5px;">
-                    <strong>📋 Detalles:</strong>
-                    <p style="margin: 5px 0 0 0;">${r.detalles}</p>
-                </div>`;
+                <strong>📋 Detalles:</strong>
+                <p style="margin: 5px 0 0 0;">${r.detalles}</p>
+            </div>`;
             }
 
-            html += `<p style="margin-top: 15px; font-size: 0.85em; color: #666;"><strong>📄 Fuente:</strong> ${r.fuente}</p>`;
+            // Contexto PDF (si RAG está activo)
+            if (r.contexto_pdf) {
+              html += `<div style="margin: 15px 0; padding: 10px; background: #e7f3ff; border-left: 4px solid #0066cc; border-radius: 5px;">
+                <strong>📖 Verificado con documento fuente:</strong>
+                <p style="margin: 5px 0 0 0; font-size: 0.9em; font-style: italic; color: #555;">"${r.contexto_pdf}"</p>
+            </div>`;
+            }
+
+            html += `<p style="margin-top: 15px; font-size: 0.85em; color: #666;"><strong>📄 ${r.fuente}</strong></p>`;
 
             resultDiv.className = "result show success";
             resultDiv.innerHTML = html;
