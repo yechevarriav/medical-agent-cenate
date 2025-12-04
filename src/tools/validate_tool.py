@@ -132,7 +132,7 @@ class ValidateTelecolposcopiaTool:
             else:
                 resultado["fuente"] = f"{self.criterios_base['fuente_base']} (Verificación RAG no disponible)"
         else:
-            resultado["fuente"] = f"{self.criterios_base['fuente_base']} (Modo rápido - sin RAG)"
+            resultado["fuente"] = f"{self.criterios_base['fuente_base']} "
 
         return resultado
 
