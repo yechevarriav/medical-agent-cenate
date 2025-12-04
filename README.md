@@ -5,6 +5,8 @@
 [![LangChain](https://img.shields.io/badge/LangChain-0.3.0-orange.svg)](https://www.langchain.com/)
 [![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4o--mini-purple.svg)](https://openai.com/)
 [![Railway](https://img.shields.io/badge/Deploy-Railway-blueviolet.svg)](https://railway.app/)
+[![AWS Lambda](https://img.shields.io/badge/AWS-Lambda-ff9900.svg)](https://aws.amazon.com/lambda/)
+[![CI/CD](https://img.shields.io/badge/CI/CD-GitHub_Actions-2088FF.svg)](https://github.com/features/actions)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 > **Asistente Virtual basado en IA para automatizar procedimientos médicos de telemedicina en EsSalud - CENATE**
@@ -24,9 +26,6 @@
 - [API Reference](#-api-reference)
 - [Estructura del Proyecto](#-estructura-del-proyecto)
 - [Deployment](#-deployment)
-- [Roadmap](#-roadmap)
-- [Contribuir](#-contribuir)
-- [Licencia](#-licencia)
 
 ---
 
@@ -111,21 +110,32 @@ Búsqueda en lenguaje natural sobre procedimientos médicos:
        ↓
 ┌─────────────┐
 │   FastAPI   │  Python 3.12
-│   Backend   │  Railway
+│   Backend   │  Railway (Orchestrator)
 └──────┬──────┘
        │
        ├──→ GPT-4o-mini (OpenAI)
        ├──→ FAISS Vector Store
-       ├──→ AWS Lambda (Serverless)
+       ├──→ AWS Lambda Functions ✅
+       │    ├─ risk-lambda (Estratificación)
+       │    └─ validate-lambda (Elegibilidad)
        └──→ CloudWatch (Monitoring)
+
+GitHub Actions → Auto Deploy → Railway
 ```
+
+**Arquitectura híbrida:**
+
+- **Railway**: Orchestrator principal + 2 tools locales (template, search)
+- **AWS Lambda**: 2 tools serverless escalables (risk, validate)
+- **CI/CD**: GitHub Actions auto-deploy en cada push
 
 **Decisiones clave:**
 
 - **GPT-4o-mini** vs Gemini: Tool calling robusto, 70% más barato que GPT-4
 - **RAG** vs Fine-tuning: $0 setup, actualización instantánea, trazabilidad
 - **FAISS** vs Pinecone: Local, gratis, sub-segundo para 133 chunks
-- **Railway** vs AWS: Deploy en 2 min, ideal para MVP
+- **Railway** vs AWS: Deploy en 2 min, ideal para orchestrator
+- **Lambda** para tools críticas: Escalado automático, pay-per-use
 
 Ver [docs/02-ARQUITECTURA.md](docs/02-ARQUITECTURA.md) para detalles completos.
 
@@ -410,7 +420,7 @@ medical-agent-cenate/
 
 ## 🚢 Deployment
 
-### Deploy a Railway (Recomendado para MVP)
+### Deploy a Railway (Orchestrator + 2 Tools Locales)
 
 1. **Fork este repositorio** en tu cuenta de GitHub
 
@@ -428,6 +438,9 @@ medical-agent-cenate/
    OPENAI_API_KEY=sk-proj-...
    PORT=8000
    ENVIRONMENT=production
+   AWS_REGION=us-east-1
+   LAMBDA_RISK_ARN=arn:aws:lambda:us-east-1:123456789012:function:risk-lambda
+   LAMBDA_VALIDATE_ARN=arn:aws:lambda:us-east-1:123456789012:function:validate-lambda
    ```
 
 5. **Railway auto-detecta** el `Dockerfile` y deploya
@@ -437,6 +450,143 @@ medical-agent-cenate/
    - URL: `https://medical-agent-cenate-production.up.railway.app`
 
 **Deploy time:** 2-3 minutos ⚡
+
+---
+
+### Deploy AWS Lambda Functions (2 Tools Serverless)
+
+**Funciones Lambda deployadas:**
+
+| Función             | ARN                                                   | Runtime     | Memory | Timeout | Trigger        |
+| ------------------- | ----------------------------------------------------- | ----------- | ------ | ------- | -------------- |
+| **risk-lambda**     | arn:aws:lambda:us-east-1:...:function:risk-lambda     | Python 3.12 | 512MB  | 30s     | FastAPI invoke |
+| **validate-lambda** | arn:aws:lambda:us-east-1:...:function:validate-lambda | Python 3.12 | 256MB  | 10s     | FastAPI invoke |
+
+**¿Por qué estas 2 tools en Lambda?**
+
+- ✅ **Escalado automático**: 0-1000 ejecuciones concurrentes
+- ✅ **Pay-per-use**: $0.20 por 1M requests (vs $5/mes siempre activo)
+- ✅ **Aislamiento**: Fallas en Lambda no afectan Railway
+- ✅ **Performance**: Cold start 500ms, warm 50ms
+
+**Crear funciones Lambda:**
+
+1. **Empaquetar código:**
+
+```bash
+cd lambda/risk_lambda
+pip install -r requirements.txt -t package/
+cp lambda_function.py package/
+cd package && zip -r ../risk-lambda.zip . && cd ..
+```
+
+2. **Crear función en AWS Console:**
+
+```bash
+aws lambda create-function \
+  --function-name risk-lambda \
+  --runtime python3.12 \
+  --role arn:aws:iam::123456789012:role/lambda-execution-role \
+  --handler lambda_function.handler \
+  --zip-file fileb://risk-lambda.zip \
+  --timeout 30 \
+  --memory-size 512 \
+  --environment Variables={OPENAI_API_KEY=sk-proj-...}
+```
+
+3. **Configurar en Railway:**
+
+```python
+# Agregar a .env en Railway
+LAMBDA_RISK_ARN=arn:aws:lambda:us-east-1:123456789012:function:risk-lambda
+LAMBDA_VALIDATE_ARN=arn:aws:lambda:us-east-1:123456789012:function:validate-lambda
+```
+
+4. **FastAPI invoca Lambda automáticamente:**
+
+```python
+# main.py ya configurado
+import boto3
+
+lambda_client = boto3.client('lambda', region_name='us-east-1')
+
+@app.post("/risk")
+async def estratificar_riesgo(req: RiskRequest):
+    # Invocar Lambda en lugar de tool local
+    response = lambda_client.invoke(
+        FunctionName=os.getenv('LAMBDA_RISK_ARN'),
+        InvocationType='RequestResponse',
+        Payload=json.dumps(req.dict())
+    )
+    return json.loads(response['Payload'].read())
+```
+
+Ver [docs/AWS-LAMBDA.md](docs/AWS-LAMBDA.md) para guía completa paso a paso.
+
+---
+
+### CI/CD con GitHub Actions
+
+**Pipeline automático en cada push a `main`:**
+
+```yaml
+# .github/workflows/main.yml
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest flake8
+      - name: Lint with flake8
+        run: flake8 src/ --max-line-length=120
+      - name: Run tests
+        run: pytest tests/ -v
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Deploy to Railway
+        run: |
+          curl -X POST ${{ secrets.RAILWAY_WEBHOOK_URL }}
+      - name: Update Lambda functions
+        run: |
+          aws lambda update-function-code \
+            --function-name risk-lambda \
+            --zip-file fileb://lambda/risk_lambda.zip
+```
+
+**Configurar secrets en GitHub:**
+
+- Repository → Settings → Secrets → Actions
+- Agregar: `RAILWAY_WEBHOOK_URL`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`
+
+**Status del pipeline:**
+
+- ✅ Tests pasan → Auto-deploy a Railway + Lambda
+- ❌ Tests fallan → No deploy, notificación por email
+
+**Ver logs:**
+
+- GitHub → Actions → Seleccionar workflow
+
+---
 
 ### Deploy Manual con Docker
 
@@ -448,6 +598,8 @@ docker build -t cenate-medical-assistant .
 docker run -d \
   -p 8000:8000 \
   -e OPENAI_API_KEY=sk-proj-... \
+  -e LAMBDA_RISK_ARN=arn:aws:lambda:... \
+  -e LAMBDA_VALIDATE_ARN=arn:aws:lambda:... \
   --name cenate-app \
   cenate-medical-assistant
 
@@ -456,46 +608,6 @@ docker logs -f cenate-app
 ```
 
 ---
-
-## 🗺️ Roadmap
-
-### ✅ Fase 1: MVP (Completado)
-
-- [x] 4 tools médicas funcionando
-- [x] Vector store FAISS con 2 PDFs
-- [x] API REST con FastAPI
-- [x] Frontend web responsive
-- [x] Deploy a Railway (endpoint público)
-- [x] Validación híbrida (lógica + RAG)
-
-### 🚧 Fase 2: Serverless (En progreso)
-
-- [ ] Migrar 2 tools a AWS Lambda
-- [ ] AWS Step Functions workflow
-- [ ] CloudWatch monitoring completo
-- [ ] GitHub Actions CI/CD
-
-### 📋 Fase 3: Producción (Planificado)
-
-- [ ] Autenticación OAuth2
-- [ ] Integración HIS EsSalud (HL7 FHIR)
-- [ ] Caching con Redis
-- [ ] Rate limiting
-- [ ] Dashboard analytics
-
-### 🚀 Fase 4: Expansión (Futuro)
-
-- [ ] Fine-tuning GPT-4o-mini
-- [ ] App móvil (React Native)
-- [ ] Agente ReAct completo
-- [ ] Multi-tenancy (20+ hospitales)
-- [ ] Análisis predictivo ML
-
----
-
-## 🤝 Contribuir
-
-¡Las contribuciones son bienvenidas!
 
 ### Guía de Contribución
 
@@ -550,8 +662,8 @@ Este proyecto está bajo la licencia MIT - ver [LICENSE](LICENSE) para detalles.
 **Yvonne Echevarria**
 
 - GitHub: [@yechevarriav](https://github.com/yechevarriav)
-- LinkedIn: [Yvonne Echevarria](https://linkedin.com/in/yechevarria)
-- Email: yechevarria@osce.gob.pe
+- LinkedIn: [Yvonne Echevarria](https://www.linkedin.com/in/yvonne-echevarria-7373aa67)
+- Email: yechevarriav@gmail.com
 
 ---
 
@@ -567,7 +679,6 @@ Este proyecto está bajo la licencia MIT - ver [LICENSE](LICENSE) para detalles.
 
 ## 📞 Soporte
 
-- **Issues**: [GitHub Issues](https://github.com/yechevarriav/medical-agent-cenate/issues)
 - **Documentación**: [docs/](docs/)
 - **Demo**: https://medical-agent-cenate-production.up.railway.app
 
@@ -586,8 +697,6 @@ Este proyecto está bajo la licencia MIT - ver [LICENSE](LICENSE) para detalles.
 
 <div align="center">
 
-**⭐ Si este proyecto te resultó útil, considera darle una estrella en GitHub**
-
-Made with ❤️ by Yvonne Echevarria | © 2024 OSCE / BSG Institute
+Made with ❤️ by Yvonne Echevarria | © 2025 BSG Institute
 
 </div>
